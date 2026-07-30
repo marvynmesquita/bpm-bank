@@ -22,6 +22,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   bool _isShared = false;
   bool _isRecurring = false;
   bool _isLoading = false;
+  DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
@@ -34,6 +35,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       _selectedCategoryId = e.categoryId;
       _isShared = e.sharedWithUserId != null;
       _isRecurring = e.isRecurring;
+      _selectedDate = e.date;
     }
   }
 
@@ -82,7 +84,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           amount: amount,
           description: _descController.text,
           categoryId: _selectedCategoryId,
-          date: DateTime.now(),
+          date: _selectedDate,
           sharedWithUserId: _isShared ? partnerUid : null, 
           isRecurring: _isRecurring,
         );
@@ -95,7 +97,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           amount: amount,
           description: _descController.text,
           categoryId: _selectedCategoryId,
-          date: widget.expense!.date, // Mantém a data original
+          date: _selectedDate,
           sharedWithUserId: _isShared ? partnerUid : null, 
           isRecurring: _isRecurring,
           isPaid: widget.expense!.isPaid,
@@ -143,6 +145,27 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               TextField(
                 controller: _descController,
                 decoration: const InputDecoration(labelText: 'Descrição'),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                title: const Text('Data da despesa', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                subtitle: Text(
+                  '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}',
+                  style: const TextStyle(fontSize: 16, color: Colors.black87),
+                ),
+                trailing: const Icon(Icons.calendar_today),
+                onTap: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedDate,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (date != null) {
+                    setState(() => _selectedDate = date);
+                  }
+                },
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
               ),
               const SizedBox(height: 16),
               TextField(
