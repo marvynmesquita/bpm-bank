@@ -95,6 +95,13 @@ class AuthRepository {
     await _firestore.collection('users').doc(userId).update({'monthly_income': income});
   }
 
+  Future<void> updatePayDay(int payDay) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+    
+    await _firestore.collection('users').doc(userId).update({'pay_day': payDay});
+  }
+
   Future<void> setPartnerEmail(String partnerEmail) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) throw Exception('Usuário não autenticado');

@@ -6,6 +6,7 @@ class UserModel {
   final DateTime createdAt;
   final String? partnerEmail;
   final String? partnerUid;
+  final int? payDay;
 
   UserModel({
     required this.id,
@@ -15,6 +16,7 @@ class UserModel {
     DateTime? createdAt,
     this.partnerEmail,
     this.partnerUid,
+    this.payDay,
   }) : this.createdAt = createdAt ?? DateTime.now();
 
   factory UserModel.fromJson(Map<String, dynamic> json, String documentId) {
@@ -28,6 +30,7 @@ class UserModel {
           : DateTime.now(),
       partnerEmail: json['partner_email'],
       partnerUid: json['partner_uid'],
+      payDay: json['pay_day'] as int?,
     );
   }
 
@@ -39,6 +42,7 @@ class UserModel {
       'created_at': createdAt.toIso8601String(),
       if (partnerEmail != null) 'partner_email': partnerEmail,
       if (partnerUid != null) 'partner_uid': partnerUid,
+      if (payDay != null) 'pay_day': payDay,
     };
   }
 }

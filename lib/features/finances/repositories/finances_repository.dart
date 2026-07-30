@@ -30,7 +30,10 @@ final categoriesProvider = StreamProvider<List<CategoryModel>>((ref) async* {
 final currentMonthExpensesProvider = StreamProvider<List<ExpenseModel>>((ref) async* {
   final repo = ref.watch(financesRepositoryProvider);
   final categories = await ref.watch(categoriesProvider.future);
-  final stream = repo.getExpensesForCurrentMonth();
+  final user = await ref.watch(currentUserProvider.future);
+  final payDay = user?.payDay ?? 1;
+
+  final stream = repo.getExpensesForCurrentMonth(payDay: payDay);
   
   await for (final expenses in stream) {
     yield expenses.map((e) {
@@ -126,13 +129,38 @@ class FinancesRepository {
 
   // --- DESPESAS ---
 
-  Stream<List<ExpenseModel>> getExpensesForCurrentMonth() {
+  Stream<List<ExpenseModel>> getExpensesForCurrentMonth({int payDay = 1}) {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return Stream.value([]);
 
     final now = DateTime.now();
-    final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String().split('T').first;
-    final endOfMonth = DateTime(now.year, now.month + 1, 0).toIso8601String().split('T').first;
+    DateTime start, end;
+
+    int daysInMonth(int year, int month) => DateTime(year, month + 1, 0).day;
+    int safeDay(int year, int month, int day) {
+      final max = daysInMonth(year, month);
+      return day > max ? max : day;
+    }
+
+    if (now.day >= payDay) {
+      start = DateTime(now.year, now.month, safeDay(now.year, now.month, payDay));
+      final endMonth = now.month + 1;
+      final endYear = endMonth > 12 ? now.year + 1 : now.year;
+      final eMonth = endMonth > 12 ? 1 : endMonth;
+      final nextPayDay = safeDay(endYear, eMonth, payDay);
+      end = DateTime(endYear, eMonth, nextPayDay).subtract(const Duration(days: 1));
+    } else {
+      final startMonth = now.month - 1;
+      final startYear = startMonth < 1 ? now.year - 1 : now.year;
+      final sMonth = startMonth < 1 ? 12 : startMonth;
+      start = DateTime(startYear, sMonth, safeDay(startYear, sMonth, payDay));
+      
+      final nextPayDay = safeDay(now.year, now.month, payDay);
+      end = DateTime(now.year, now.month, nextPayDay).subtract(const Duration(days: 1));
+    }
+
+    final startStr = start.toIso8601String().split('T').first;
+    final endStr = end.toIso8601String().split('T').first;
 
     // Despesas do mês atual
     final currentMonthStream = _firestore
@@ -141,8 +169,8 @@ class FinancesRepository {
           Filter('user_id', isEqualTo: userId),
           Filter('shared_with_user_id', isEqualTo: userId),
         ))
-        .where('date', isGreaterThanOrEqualTo: startOfMonth)
-        .where('date', isLessThanOrEqualTo: endOfMonth)
+        .where('date', isGreaterThanOrEqualTo: startStr)
+        .where('date', isLessThanOrEqualTo: endStr)
         .orderBy('date', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
@@ -157,23 +185,32 @@ class FinancesRepository {
           Filter('shared_with_user_id', isEqualTo: userId),
         ))
         .where('is_recurring', isEqualTo: true)
-        .where('date', isLessThan: startOfMonth)
+        .where('date', isLessThan: startStr)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => ExpenseModel.fromJson(doc.data(), doc.id))
-            .map((e) => ExpenseModel(
-                  id: e.id,
-                  userId: e.userId,
-                  categoryId: e.categoryId,
-                  amount: e.amount,
-                  description: e.description,
-                  date: DateTime(now.year, now.month, e.date.day),
-                  sharedWithUserId: e.sharedWithUserId,
-                  isPaid: e.isPaid,
-                  isRecurring: e.isRecurring,
-                  currentInstallment: e.currentInstallment,
-                  totalInstallments: e.totalInstallments,
-                ))
+            .map((e) {
+                  DateTime projectedDate;
+                  if (e.date.day >= payDay) {
+                     projectedDate = DateTime(start.year, start.month, safeDay(start.year, start.month, e.date.day));
+                  } else {
+                     projectedDate = DateTime(end.year, end.month, safeDay(end.year, end.month, e.date.day));
+                  }
+                  
+                  return ExpenseModel(
+                    id: e.id,
+                    userId: e.userId,
+                    categoryId: e.categoryId,
+                    amount: e.amount,
+                    description: e.description,
+                    date: projectedDate,
+                    sharedWithUserId: e.sharedWithUserId,
+                    isPaid: e.isPaid,
+                    isRecurring: e.isRecurring,
+                    currentInstallment: e.currentInstallment,
+                    totalInstallments: e.totalInstallments,
+                  );
+                })
             .toList());
 
     return Rx.combineLatest2(currentMonthStream, pastRecurringStream, 

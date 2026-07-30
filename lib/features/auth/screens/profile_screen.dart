@@ -12,6 +12,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _incomeController = TextEditingController();
+  final _payDayController = TextEditingController();
   final _partnerEmailController = TextEditingController();
   bool _isLoading = false;
   bool _isLoadingPartner = false;
@@ -19,16 +20,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   void dispose() {
     _incomeController.dispose();
+    _payDayController.dispose();
     _partnerEmailController.dispose();
     super.dispose();
   }
 
-  Future<void> _updateIncome() async {
+  Future<void> _updateProfile() async {
     final text = _incomeController.text.replaceAll(',', '.');
     final income = double.tryParse(text);
-    if (income == null || income < 0) {
+    final payDay = int.tryParse(_payDayController.text);
+
+    if (income == null || income < 0 || payDay == null || payDay < 1 || payDay > 31) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Valor inválido')),
+        const SnackBar(content: Text('Valores inválidos. O dia deve ser entre 1 e 31.')),
       );
       return;
     }
@@ -36,10 +40,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() => _isLoading = true);
     try {
       await ref.read(authRepositoryProvider).updateIncome(income);
+      await ref.read(authRepositoryProvider).updatePayDay(payDay);
       ref.invalidate(currentUserProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Renda atualizada com sucesso!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Configurações atualizadas com sucesso!'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
@@ -113,7 +118,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                const Text('Sua Renda Mensal', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Configurações Financeiras', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -128,16 +133,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _updateIncome,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    Expanded(
+                      child: TextField(
+                        controller: _payDayController..text = user.payDay?.toString() ?? '1',
+                        decoration: const InputDecoration(
+                          labelText: 'Dia do Pagamento',
+                          hintText: 'Ex: 5',
+                        ),
+                        keyboardType: TextInputType.number,
                       ),
-                      child: _isLoading 
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('Salvar'),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _updateProfile,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: _isLoading 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Salvar Configurações'),
                 ),
                 const SizedBox(height: 32),
                 const Text('Vínculo de Parceira(o)', style: TextStyle(fontWeight: FontWeight.bold)),
