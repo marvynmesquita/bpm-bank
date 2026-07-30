@@ -12,13 +12,18 @@ final geminiInsightProvider = FutureProvider<String>((ref) async {
   }
 
   // Agrupar por categoria
-  final summary = <String, double>{};
+  final summary = <String, Map<String, dynamic>>{};
   for (var e in expenses) {
     final catName = e.category?.name ?? 'Outros';
-    summary[catName] = (summary[catName] ?? 0) + e.effectiveAmount;
+    final type = e.category?.type ?? 'outros';
+    
+    if (!summary.containsKey(catName)) {
+      summary[catName] = {'amount': 0.0, 'type': type};
+    }
+    summary[catName]!['amount'] = (summary[catName]!['amount'] as double) + e.effectiveAmount;
   }
 
-  final summaryStr = summary.entries.map((e) => '${e.key}: R\$ ${e.value}').join(', ');
+  final summaryStr = summary.entries.map((e) => '${e.key} (${e.value['type']}): R\$ ${e.value['amount']}').join(', ');
   
   final groq = GroqService();
   return await groq.getFinancialInsight(summaryStr);
@@ -169,7 +174,8 @@ class HomeScreen extends ConsumerWidget {
               data: (categories) {
                 final fixedCategories = categories.where((c) => c.type == 'fixa').toList();
                 final creditCards = categories.where((c) => c.type == 'credito').toList();
-                if (fixedCategories.isEmpty && creditCards.isEmpty) return const SizedBox.shrink();
+                final benefits = categories.where((c) => c.type == 'beneficio').toList();
+                if (fixedCategories.isEmpty && creditCards.isEmpty && benefits.isEmpty) return const SizedBox.shrink();
 
                 return expensesAsync.when(
                   data: (expenses) {
@@ -254,6 +260,64 @@ class HomeScreen extends ConsumerWidget {
                             ),
                           );
                         }).toList(),
+                        if (benefits.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          Text(
+                            'Benefícios',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 16),
+                          ...benefits.map((cat) {
+                            final spent = summary[cat.id] ?? 0.0;
+                            final fixed = cat.fixedValue;
+                            final percentage = (fixed != null && fixed > 0) ? (spent / fixed).clamp(0.0, 1.0) : 0.0;
+                            
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: InkWell(
+                                onTap: () => showCategoryExpenses(cat, expenses),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(cat.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          if (fixed != null)
+                                            Text('${(percentage * 100).toStringAsFixed(0)}%'),
+                                        ],
+                                      ),
+                                      if (fixed != null) ...[
+                                        const SizedBox(height: 8),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(4),
+                                          child: LinearProgressIndicator(
+                                            value: percentage,
+                                            backgroundColor: Colors.grey.shade200,
+                                            color: Colors.blueAccent,
+                                            minHeight: 8,
+                                          ),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text('Utilizado: R\$ ${spent.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                          if (fixed != null)
+                                            Text('Disponível: R\$ ${(fixed - spent).clamp(0.0, double.infinity).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ],
                         if (creditCards.isNotEmpty) ...[
                           const SizedBox(height: 24),
                           Text(

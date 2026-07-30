@@ -17,10 +17,11 @@ class GroqService {
   Future<String> getFinancialInsight(String expensesSummary) async {
     final prompt = '''
 Você é um consultor financeiro de casais sênior, especialista em finanças pessoais e economia.
-Analise o seguinte resumo de despesas dos últimos 30-60 dias do casal e forneça um único parágrafo curto e direto (máx. 3 frases) com uma sugestão prática de economia ou otimização.
-Seja encorajador, porém realista. Não use formatação markdown como negrito ou listas, apenas texto corrido.
+Analise o seguinte resumo de gastos do casal e forneça um único parágrafo curto e direto (máx. 3 frases) com uma sugestão prática.
+Nota importante: As categorias marcadas com o tipo "(beneficio)" representam valores extras recebidos mensalmente (como auxílios empresariais ou cartões de benefícios). Gastar esse saldo não é negativo para a saúde financeira, pois o dinheiro foi destinado especificamente para isso.
+Seja encorajador, porém realista. Não use formatação markdown, apenas texto corrido.
 
-Resumo das despesas:
+Resumo dos gastos:
 $expensesSummary
 ''';
 

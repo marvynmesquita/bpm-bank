@@ -19,7 +19,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   bool _isLoading = false;
   CategoryModel? _editingCategory;
 
-  final List<String> _types = ['credito', 'fixa', 'variavel', 'outros'];
+  final List<String> _types = ['credito', 'fixa', 'variavel', 'beneficio', 'outros'];
 
   @override
   void dispose() {
