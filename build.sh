@@ -9,7 +9,7 @@ echo "Instalando dependências..."
 flutter pub get
 
 echo "Gerando arquivo .env a partir das variáveis do Vercel..."
-echo "GEMINI_API_KEY=\"$GEMINI_API_KEY\"" > .env
+echo "GROQ_API_KEY=\"$GROQ_API_KEY\"" > .env
 echo "SUPABASE_URL=\"$SUPABASE_URL\"" >> .env
 echo "SUPABASE_ANON_KEY=\"$SUPABASE_ANON_KEY\"" >> .env
 echo "SUPABASE_PASSWORD=\"$SUPABASE_PASSWORD\"" >> .env

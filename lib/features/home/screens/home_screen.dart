@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../finances/repositories/finances_repository.dart';
-import '../../../core/services/gemini_service.dart';
+import '../../../core/services/groq_service.dart';
 
 final geminiInsightProvider = FutureProvider<String>((ref) async {
   final expenses = await ref.watch(currentMonthExpensesProvider.future);
@@ -18,8 +18,8 @@ final geminiInsightProvider = FutureProvider<String>((ref) async {
 
   final summaryStr = summary.entries.map((e) => '${e.key}: R\$ ${e.value}').join(', ');
   
-  final gemini = GeminiService();
-  return await gemini.getFinancialInsight(summaryStr);
+  final groq = GroqService();
+  return await groq.getFinancialInsight(summaryStr);
 });
 
 class HomeScreen extends ConsumerWidget {
