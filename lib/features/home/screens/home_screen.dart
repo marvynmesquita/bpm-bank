@@ -115,7 +115,8 @@ class HomeScreen extends ConsumerWidget {
             categoriesAsync.when(
               data: (categories) {
                 final fixedCategories = categories.where((c) => c.fixedValue != null).toList();
-                if (fixedCategories.isEmpty) return const SizedBox.shrink();
+                final creditCards = categories.where((c) => c.type == 'credito').toList();
+                if (fixedCategories.isEmpty && creditCards.isEmpty) return const SizedBox.shrink();
 
                 return expensesAsync.when(
                   data: (expenses) {
@@ -185,6 +186,32 @@ class HomeScreen extends ConsumerWidget {
                             ),
                           );
                         }).toList(),
+                        if (creditCards.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          Text(
+                            'Faturas de Cartões',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 16),
+                          ...creditCards.map((cat) {
+                            final spent = summary[cat.id] ?? 0.0;
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: ListTile(
+                                leading: const CircleAvatar(
+                                  backgroundColor: Colors.blueAccent,
+                                  child: Icon(Icons.credit_card, color: Colors.white),
+                                ),
+                                title: Text(cat.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text(cat.dueDay != null ? 'Vencimento: Dia ${cat.dueDay}' : 'Vencimento não configurado'),
+                                trailing: Text(
+                                  'R\$ ${spent.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.redAccent),
+                                ),
+                              ),
+                            );
+                          }),
+                        ],
                       ],
                     );
                   },
