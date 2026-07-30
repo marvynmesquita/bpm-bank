@@ -11,8 +11,10 @@ final geminiInsightProvider = FutureProvider<String>((ref) async {
     return 'Adicione suas primeiras despesas para receber um insight financeiro.';
   }
 
-  // Agrupar por categoria
+  // Agrupar por categoria e calcular total
   final summary = <String, Map<String, dynamic>>{};
+  double totalGasto = 0.0;
+  
   for (var e in expenses) {
     final catName = e.category?.name ?? 'Outros';
     final type = e.category?.type ?? 'outros';
@@ -21,12 +23,17 @@ final geminiInsightProvider = FutureProvider<String>((ref) async {
       summary[catName] = {'amount': 0.0, 'type': type};
     }
     summary[catName]!['amount'] = (summary[catName]!['amount'] as double) + e.effectiveAmount;
+    totalGasto += e.effectiveAmount;
   }
 
-  final summaryStr = summary.entries.map((e) => '${e.key} (${e.value['type']}): R\$ ${e.value['amount']}').join(', ');
+  final summaryStr = summary.entries
+      .map((e) => '${e.key} (${e.value['type']}): R\$ ${(e.value['amount'] as double).toStringAsFixed(2)}')
+      .join(', ');
+      
+  final promptData = 'Total Gasto no Mês: R\$ ${totalGasto.toStringAsFixed(2)}\nDetalhamento por categorias:\n$summaryStr';
   
   final groq = GroqService();
-  return await groq.getFinancialInsight(summaryStr);
+  return await groq.getFinancialInsight(promptData);
 });
 
 class HomeScreen extends ConsumerWidget {
