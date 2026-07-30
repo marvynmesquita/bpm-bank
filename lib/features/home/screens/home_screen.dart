@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../finances/repositories/finances_repository.dart';
+import '../../finances/models/category_model.dart';
+import '../../finances/models/expense_model.dart';
 import '../../../core/services/groq_service.dart';
 
 final geminiInsightProvider = FutureProvider<String>((ref) async {
@@ -27,6 +29,57 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    void showCategoryExpenses(CategoryModel cat, List<ExpenseModel> allExpenses) {
+      final catExpenses = allExpenses.where((e) => e.categoryId == cat.id).toList();
+      catExpenses.sort((a, b) => b.date.compareTo(a.date));
+
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) {
+          return DraggableScrollableSheet(
+            initialChildSize: 0.6,
+            maxChildSize: 0.9,
+            minChildSize: 0.4,
+            expand: false,
+            builder: (context, scrollController) {
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      'Despesas: ${cat.name}',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: catExpenses.isEmpty
+                        ? const Center(child: Text('Nenhuma despesa registrada neste mês.'))
+                        : ListView.builder(
+                            controller: scrollController,
+                            itemCount: catExpenses.length,
+                            itemBuilder: (context, index) {
+                              final e = catExpenses[index];
+                              return ListTile(
+                                title: Text(e.description != null && e.description!.isNotEmpty ? e.description! : 'Sem descrição'),
+                                subtitle: Text('${e.date.day.toString().padLeft(2, '0')}/${e.date.month.toString().padLeft(2, '0')}/${e.date.year}'),
+                                trailing: Text(
+                                  'R\$ ${e.effectiveAmount.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    }
+
     final expensesAsync = ref.watch(currentMonthExpensesProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
     final insightAsync = ref.watch(geminiInsightProvider);
@@ -151,37 +204,48 @@ class HomeScreen extends ConsumerWidget {
 
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(cat.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                      Text('${(percentage * 100).toStringAsFixed(0)}%'),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: LinearProgressIndicator(
-                                      value: percentage,
-                                      backgroundColor: Colors.grey.shade200,
-                                      color: barColor,
-                                      minHeight: 8,
+                            child: InkWell(
+                              onTap: () => showCategoryExpenses(cat, expenses),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(cat.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                            if (cat.dueDay != null)
+                                              Text('Vencimento: Dia ${cat.dueDay}', style: const TextStyle(fontSize: 12, color: Colors.orange)),
+                                          ],
+                                        ),
+                                        Text('${(percentage * 100).toStringAsFixed(0)}%'),
+                                      ],
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text('Gasto: R\$ ${spent.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                      Text('Disponível: R\$ ${(fixed - spent).clamp(0.0, double.infinity).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
-                                ],
+                                    const SizedBox(height: 8),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        value: percentage,
+                                        backgroundColor: Colors.grey.shade200,
+                                        color: barColor,
+                                        minHeight: 8,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text('Gasto: R\$ ${spent.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                        Text('Disponível: R\$ ${(fixed - spent).clamp(0.0, double.infinity).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           );
@@ -198,6 +262,7 @@ class HomeScreen extends ConsumerWidget {
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
                               child: ListTile(
+                                onTap: () => showCategoryExpenses(cat, expenses),
                                 leading: const CircleAvatar(
                                   backgroundColor: Colors.blueAccent,
                                   child: Icon(Icons.credit_card, color: Colors.white),

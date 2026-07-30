@@ -63,6 +63,8 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     if (_selectedType == 'credito') {
       closingDay = int.tryParse(_closingDayController.text);
       dueDay = int.tryParse(_dueDayController.text);
+    } else if (_selectedType == 'fixa') {
+      dueDay = int.tryParse(_dueDayController.text);
     }
 
     setState(() => _isLoading = true);
@@ -159,21 +161,23 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                     ),
                   ],
                 ),
-                if (_selectedType == 'credito') ...[
+                if (_selectedType == 'credito' || _selectedType == 'fixa') ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _closingDayController,
-                          decoration: const InputDecoration(
-                            labelText: 'Dia de Fechamento',
-                            hintText: 'Ex: 5'
+                      if (_selectedType == 'credito')
+                        Expanded(
+                          child: TextField(
+                            controller: _closingDayController,
+                            decoration: const InputDecoration(
+                              labelText: 'Dia de Fechamento',
+                              hintText: 'Ex: 5'
+                            ),
+                            keyboardType: TextInputType.number,
                           ),
-                          keyboardType: TextInputType.number,
                         ),
-                      ),
-                      const SizedBox(width: 8),
+                      if (_selectedType == 'credito')
+                        const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _dueDayController,
@@ -227,6 +231,8 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                               Text('Valor fixo: R\$ ${cat.fixedValue!.toStringAsFixed(2)}', style: const TextStyle(color: Colors.green)),
                             if (cat.type == 'credito' && (cat.closingDay != null || cat.dueDay != null))
                               Text('Fechamento: dia ${cat.closingDay ?? "?"} | Vencimento: dia ${cat.dueDay ?? "?"}', style: const TextStyle(color: Colors.orange)),
+                            if (cat.type == 'fixa' && cat.dueDay != null)
+                              Text('Vencimento: dia ${cat.dueDay}', style: const TextStyle(color: Colors.orange)),
                           ],
                         ),
                         trailing: IconButton(
