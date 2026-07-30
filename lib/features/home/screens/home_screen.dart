@@ -290,19 +290,22 @@ class HomeScreen extends ConsumerWidget {
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(cat.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                          Text(fixed != null ? '${(percentage * 100).toStringAsFixed(0)}%' : 'Sem limite', style: TextStyle(color: fixed == null ? Colors.grey : Colors.black)),
+                                          if (fixed != null)
+                                            Text('${(percentage * 100).toStringAsFixed(0)}%'),
                                         ],
                                       ),
-                                      const SizedBox(height: 8),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(4),
-                                        child: LinearProgressIndicator(
-                                          value: fixed != null ? percentage : 0.0,
-                                          backgroundColor: Colors.grey.shade200,
-                                          color: fixed != null ? barColor : Colors.grey.shade400,
-                                          minHeight: 8,
+                                      if (fixed != null) ...[
+                                        const SizedBox(height: 8),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(4),
+                                          child: LinearProgressIndicator(
+                                            value: percentage,
+                                            backgroundColor: Colors.grey.shade200,
+                                            color: barColor,
+                                            minHeight: 8,
+                                          ),
                                         ),
-                                      ),
+                                      ],
                                       const SizedBox(height: 8),
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
