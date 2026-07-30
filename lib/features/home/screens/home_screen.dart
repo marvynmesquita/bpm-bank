@@ -167,7 +167,7 @@ class HomeScreen extends ConsumerWidget {
             ),
             categoriesAsync.when(
               data: (categories) {
-                final fixedCategories = categories.where((c) => c.fixedValue != null).toList();
+                final fixedCategories = categories.where((c) => c.type == 'fixa').toList();
                 final creditCards = categories.where((c) => c.type == 'credito').toList();
                 if (fixedCategories.isEmpty && creditCards.isEmpty) return const SizedBox.shrink();
 
@@ -192,8 +192,8 @@ class HomeScreen extends ConsumerWidget {
                         const SizedBox(height: 16),
                         ...fixedCategories.map((cat) {
                           final spent = summary[cat.id] ?? 0.0;
-                          final fixed = cat.fixedValue!;
-                          final percentage = (spent / fixed).clamp(0.0, 1.0);
+                          final fixed = cat.fixedValue;
+                          final percentage = (fixed != null && fixed > 0) ? (spent / fixed).clamp(0.0, 1.0) : 0.0;
                           
                           Color barColor = Colors.green;
                           if (percentage >= 0.9) {
@@ -223,25 +223,29 @@ class HomeScreen extends ConsumerWidget {
                                               Text('Vencimento: Dia ${cat.dueDay}', style: const TextStyle(fontSize: 12, color: Colors.orange)),
                                           ],
                                         ),
-                                        Text('${(percentage * 100).toStringAsFixed(0)}%'),
+                                        if (fixed != null)
+                                          Text('${(percentage * 100).toStringAsFixed(0)}%'),
                                       ],
                                     ),
-                                    const SizedBox(height: 8),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(4),
-                                      child: LinearProgressIndicator(
-                                        value: percentage,
-                                        backgroundColor: Colors.grey.shade200,
-                                        color: barColor,
-                                        minHeight: 8,
+                                    if (fixed != null) ...[
+                                      const SizedBox(height: 8),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: LinearProgressIndicator(
+                                          value: percentage,
+                                          backgroundColor: Colors.grey.shade200,
+                                          color: barColor,
+                                          minHeight: 8,
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                     const SizedBox(height: 8),
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text('Gasto: R\$ ${spent.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                        Text('Disponível: R\$ ${(fixed - spent).clamp(0.0, double.infinity).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        if (fixed != null)
+                                          Text('Disponível: R\$ ${(fixed - spent).clamp(0.0, double.infinity).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                       ],
                                     ),
                                   ],
