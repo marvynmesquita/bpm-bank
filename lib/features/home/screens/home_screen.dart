@@ -269,6 +269,13 @@ class HomeScreen extends ConsumerWidget {
                             final fixed = cat.fixedValue;
                             final percentage = (fixed != null && fixed > 0) ? (spent / fixed).clamp(0.0, 1.0) : 0.0;
                             
+                            Color barColor = Colors.blueAccent;
+                            if (percentage >= 0.9) {
+                              barColor = Colors.red;
+                            } else if (percentage >= 0.7) {
+                              barColor = Colors.orange;
+                            }
+
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
                               child: InkWell(
@@ -292,7 +299,7 @@ class HomeScreen extends ConsumerWidget {
                                         child: LinearProgressIndicator(
                                           value: fixed != null ? percentage : 0.0,
                                           backgroundColor: Colors.grey.shade200,
-                                          color: fixed != null ? Colors.blueAccent : Colors.grey.shade400,
+                                          color: fixed != null ? barColor : Colors.grey.shade400,
                                           minHeight: 8,
                                         ),
                                       ),
