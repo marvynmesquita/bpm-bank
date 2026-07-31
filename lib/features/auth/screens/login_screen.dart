@@ -55,20 +55,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  Future<void> _submitGoogle() async {
-    setState(() => _isLoading = true);
-    try {
-      await ref.read(authRepositoryProvider).signInWithGoogle();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -127,30 +114,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         : Text(_isLogin ? 'Entrar' : 'Cadastrar'),
                   ),
                 ),
-                const SizedBox(height: 16),
-                const Row(
-                  children: [
-                    Expanded(child: Divider()),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('OU'),
-                    ),
-                    Expanded(child: Divider()),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _submitGoogle,
-                  icon: const Icon(Icons.login),
-                  label: const Text('Entrar com o Google'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+
                 TextButton(
                   onPressed: () => setState(() => _isLogin = !_isLogin),
                   child: Text(
