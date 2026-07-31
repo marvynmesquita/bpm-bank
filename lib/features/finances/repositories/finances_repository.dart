@@ -27,13 +27,16 @@ final categoriesProvider = StreamProvider<List<CategoryModel>>((ref) async* {
   }
 });
 
+final selectedMonthProvider = StateProvider<DateTime>((ref) => DateTime.now());
+
 final currentMonthExpensesProvider = StreamProvider<List<ExpenseModel>>((ref) async* {
   final repo = ref.watch(financesRepositoryProvider);
   final categories = await ref.watch(categoriesProvider.future);
   final user = await ref.watch(currentUserProvider.future);
   final payDay = user?.payDay ?? 1;
+  final baseDate = ref.watch(selectedMonthProvider);
 
-  final stream = repo.getExpensesForCurrentMonth(payDay: payDay);
+  final stream = repo.getExpensesForCurrentMonth(payDay: payDay, baseDate: baseDate);
   
   await for (final expenses in stream) {
     yield expenses.map((e) {
@@ -129,11 +132,11 @@ class FinancesRepository {
 
   // --- DESPESAS ---
 
-  Stream<List<ExpenseModel>> getExpensesForCurrentMonth({int payDay = 1}) {
+  Stream<List<ExpenseModel>> getExpensesForCurrentMonth({int payDay = 1, DateTime? baseDate}) {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return Stream.value([]);
 
-    final now = DateTime.now();
+    final now = baseDate ?? DateTime.now();
     DateTime start, end;
 
     int daysInMonth(int year, int month) => DateTime(year, month + 1, 0).day;

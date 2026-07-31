@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../finances/repositories/finances_repository.dart';
 import '../../finances/models/category_model.dart';
 import '../../finances/models/expense_model.dart';
+import '../../finances/widgets/month_selector.dart';
 import '../../../core/services/groq_service.dart';
 
 final geminiInsightProvider = FutureProvider<String>((ref) async {
@@ -103,6 +104,8 @@ class HomeScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const MonthSelector(),
+            const SizedBox(height: 16),
             Card(
               elevation: 4,
               shadowColor: Colors.black12,

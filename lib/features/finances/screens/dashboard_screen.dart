@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../repositories/finances_repository.dart';
+import '../models/expense_model.dart';
+import '../widgets/month_selector.dart';
 import 'add_expense_screen.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -12,8 +14,12 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Dashboard')),
-      body: expensesAsync.when(
-        data: (expenses) {
+      body: Column(
+        children: [
+          const MonthSelector(),
+          Expanded(
+            child: expensesAsync.when(
+              data: (expenses) {
           final total = expenses.fold<double>(0, (sum, e) => sum + e.effectiveAmount);
           
           return Padding(
@@ -98,6 +104,9 @@ class DashboardScreen extends ConsumerWidget {
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, st) => Center(child: Text('Erro ao carregar despesas: $e')),
+      ),
+          ),
+        ],
       ),
     );
   }
