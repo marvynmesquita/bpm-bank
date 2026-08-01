@@ -1,15 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class GroqService {
   final String _apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
   late final String _apiKey;
 
   GroqService() {
-    final apiKey = dotenv.env['GROQ_API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
-      throw Exception('GROQ_API_KEY not found in .env');
+    const apiKey = String.fromEnvironment('GROQ_API_KEY');
+    if (apiKey.isEmpty) {
+      throw Exception('GROQ_API_KEY not found in dart defines. Use --dart-define-from-file=.env or --dart-define=GROQ_API_KEY=...');
     }
     _apiKey = apiKey;
   }

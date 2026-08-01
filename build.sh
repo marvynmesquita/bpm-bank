@@ -15,4 +15,4 @@ echo "SUPABASE_ANON_KEY=\"$SUPABASE_ANON_KEY\"" >> .env
 echo "SUPABASE_PASSWORD=\"$SUPABASE_PASSWORD\"" >> .env
 
 echo "Compilando para Web..."
-flutter build web --release
+flutter build web --release --dart-define-from-file=.env

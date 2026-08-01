@@ -7,7 +7,6 @@ import '../../finances/widgets/month_selector.dart';
 import '../../../core/services/groq_service.dart';
 import '../widgets/category_summary_card.dart';
 import '../widgets/category_expenses_sheet.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../auth/screens/profile_screen.dart';
 import 'notifications_screen.dart';
 import '../../auth/repositories/auth_repository.dart';
@@ -53,28 +52,11 @@ final expensesSummaryProvider = Provider<Map<String, double>>((ref) {
   return summary;
 });
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final expensesAsync = ref.watch(currentMonthExpensesProvider);
-    final categoriesAsync = ref.watch(categoriesProvider);
-    final insightAsync = ref.watch(geminiInsightProvider);
-    final summary = ref.watch(expensesSummaryProvider);
-    
-    final userAsync = ref.watch(currentUserProvider);
-    final userName = userAsync.valueOrNull?.name ?? 'Usuário';
-    final nameParts = userName.trim().split(' ');
-    final firstName = nameParts.isNotEmpty ? nameParts.first : 'Usuário';
-    
-    String initials = "U";
-    if (nameParts.length > 1) {
-      initials = "${nameParts[0][0]}${nameParts[1][0]}".toUpperCase();
-    } else if (nameParts.isNotEmpty && nameParts[0].isNotEmpty) {
-      initials = nameParts[0][0].toUpperCase();
-    }
-
+  Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -94,7 +76,7 @@ class HomeScreen extends ConsumerWidget {
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
-              SliverToBoxAdapter(child: _buildHeader(context, firstName, initials)),
+              const SliverToBoxAdapter(child: _HeaderWidget()),
               const SliverToBoxAdapter(child: SizedBox(height: 20)),
               const SliverToBoxAdapter(
                 child: Padding(
@@ -103,47 +85,39 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
-              SliverToBoxAdapter(child: _buildInsightCard(context, insightAsync)),
+              const SliverToBoxAdapter(child: _InsightCardWidget()),
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
-              SliverToBoxAdapter(child: _buildSectionTitle(context, "Resumo Rápido", "💸")),
-              SliverToBoxAdapter(child: _buildQuickSummary(context, expensesAsync)),
-              categoriesAsync.when(
-                data: (categories) {
-                  final fixedCategories = categories.where((c) => c.type == 'fixa').toList();
-                  final creditCards = categories.where((c) => c.type == 'credito').toList();
-                  final benefits = categories.where((c) => c.type == 'beneficio').toList();
-                  final allExpenses = expensesAsync.valueOrNull ?? [];
-
-                  return SliverList(
-                    delegate: SliverChildListDelegate([
-                      if (fixedCategories.isNotEmpty) ...[
-                        _buildSectionTitle(context, "Acompanhamento de Limites", "📊"),
-                        _buildCategoryList(context, fixedCategories, summary, allExpenses, Theme.of(context).colorScheme.secondary),
-                      ],
-                      if (benefits.isNotEmpty) ...[
-                        _buildSectionTitle(context, "Benefícios", "🎁"),
-                        _buildCategoryList(context, benefits, summary, allExpenses, Theme.of(context).colorScheme.primary),
-                      ],
-                      if (creditCards.isNotEmpty) ...[
-                        _buildSectionTitle(context, "Faturas de Cartões", "💳"),
-                        _buildCreditCardsList(context, creditCards, summary, allExpenses),
-                      ],
-                      const SizedBox(height: 120), // Espaço pro BottomNavigationBar
-                    ]),
-                  );
-                },
-                loading: () => const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator())),
-                error: (e, _) => SliverToBoxAdapter(child: Text('Erro: $e')),
-              ),
+              const SliverToBoxAdapter(child: _SectionTitle(title: "Resumo Rápido", emoji: "💸")),
+              const SliverToBoxAdapter(child: _QuickSummaryWidget()),
+              const _CategoryListsWidget(),
             ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildHeader(BuildContext context, String firstName, String initials) {
+class _HeaderWidget extends ConsumerWidget {
+  const _HeaderWidget();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userAsync = ref.watch(currentUserProvider);
+    final userName = userAsync.valueOrNull?.name.trim();
+    final effectiveName = (userName != null && userName.isNotEmpty) ? userName : 'Usuário';
+    final nameParts = effectiveName.split(RegExp(r'\s+'));
+    final firstName = nameParts.first;
+    
+    String initials = "U";
+    if (nameParts.length > 1) {
+      initials = "${nameParts[0][0]}${nameParts[1][0]}".toUpperCase();
+    } else if (nameParts[0].isNotEmpty) {
+      initials = nameParts[0][0].toUpperCase();
+    }
+    
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
       child: Row(
@@ -218,7 +192,7 @@ class HomeScreen extends ConsumerWidget {
                 boxShadow: [
                   BoxShadow(
                     blurRadius: 12,
-                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -247,8 +221,37 @@ class HomeScreen extends ConsumerWidget {
       ),
     );
   }
+}
 
-  Widget _buildInsightCard(BuildContext context, AsyncValue<String> insightAsync) {
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  final String emoji;
+  const _SectionTitle({required this.title, required this.emoji});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 22)),
+          const SizedBox(width: 10),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InsightCardWidget extends ConsumerWidget {
+  const _InsightCardWidget();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final insightAsync = ref.watch(geminiInsightProvider);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
@@ -262,7 +265,7 @@ class HomeScreen extends ConsumerWidget {
           boxShadow: [
             BoxShadow(
               blurRadius: 24,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.4),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
               offset: const Offset(0, 12),
             ),
           ],
@@ -275,7 +278,7 @@ class HomeScreen extends ConsumerWidget {
               child: Container(
                 width: 120,
                 height: 120,
-                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.1)),
+                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.1)),
               ),
             ),
             Positioned(
@@ -284,7 +287,7 @@ class HomeScreen extends ConsumerWidget {
               child: Container(
                 width: 100,
                 height: 100,
-                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.08)),
+                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.08)),
               ),
             ),
             Padding(
@@ -296,7 +299,7 @@ class HomeScreen extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
@@ -334,30 +337,16 @@ class HomeScreen extends ConsumerWidget {
       ),
     );
   }
+}
 
-  Widget _buildSectionTitle(BuildContext context, String title, String emoji) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-      child: Row(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 22)),
-          const SizedBox(width: 10),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5),
-          ),
-          const Spacer(),
-          Text(
-            "Ver Tudo",
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.primary),
-          ),
-        ],
-      ),
-    );
-  }
+class _QuickSummaryWidget extends ConsumerWidget {
+  const _QuickSummaryWidget();
 
-  Widget _buildQuickSummary(BuildContext context, AsyncValue<List<ExpenseModel>> expensesAsync) {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final expensesAsync = ref.watch(currentMonthExpensesProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return expensesAsync.when(
       data: (expenses) {
         final total = expenses.fold<double>(0, (sum, e) => sum + e.effectiveAmount);
@@ -372,7 +361,7 @@ class HomeScreen extends ConsumerWidget {
               boxShadow: [
                 BoxShadow(
                   blurRadius: 16,
-                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
                   offset: const Offset(0, 6),
                 ),
               ],
@@ -383,12 +372,12 @@ class HomeScreen extends ConsumerWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.error.withOpacity(0.12),
+                    color: Theme.of(context).colorScheme.error.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(18),
                     boxShadow: [
                       BoxShadow(
                         blurRadius: 10,
-                        color: Theme.of(context).colorScheme.error.withOpacity(0.2),
+                        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.2),
                         offset: const Offset(0, 4),
                       ),
                     ],
@@ -416,6 +405,51 @@ class HomeScreen extends ConsumerWidget {
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Text('Erro: $e'),
+    );
+  }
+}
+
+class _CategoryListsWidget extends ConsumerWidget {
+  const _CategoryListsWidget();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final categoriesAsync = ref.watch(categoriesProvider);
+    final summary = ref.watch(expensesSummaryProvider);
+    final expensesAsync = ref.watch(currentMonthExpensesProvider);
+
+    return categoriesAsync.when(
+      data: (categories) {
+        final fixedCategories = categories.where((c) => c.type == 'fixa').toList();
+        final variableCategories = categories.where((c) => c.type == 'variavel').toList();
+        final creditCards = categories.where((c) => c.type == 'credito').toList();
+        final benefits = categories.where((c) => c.type == 'beneficio').toList();
+        final allExpenses = expensesAsync.valueOrNull ?? [];
+
+        return SliverList(
+          delegate: SliverChildListDelegate([
+            if (variableCategories.isNotEmpty) ...[
+              const _SectionTitle(title: "Acompanhamento de Limites", emoji: "📊"),
+              _buildCategoryList(context, variableCategories, summary, allExpenses, Theme.of(context).colorScheme.tertiary),
+            ],
+            if (fixedCategories.isNotEmpty) ...[
+              const _SectionTitle(title: "Despesas Fixas", emoji: "📌"),
+              _buildCategoryList(context, fixedCategories, summary, allExpenses, Theme.of(context).colorScheme.secondary),
+            ],
+            if (benefits.isNotEmpty) ...[
+              const _SectionTitle(title: "Benefícios", emoji: "🎁"),
+              _buildCategoryList(context, benefits, summary, allExpenses, Theme.of(context).colorScheme.primary),
+            ],
+            if (creditCards.isNotEmpty) ...[
+              const _SectionTitle(title: "Faturas de Cartões", emoji: "💳"),
+              _buildCreditCardsList(context, creditCards, summary, allExpenses),
+            ],
+            const SizedBox(height: 120), // Espaço pro BottomNavigationBar
+          ]),
+        );
+      },
+      loading: () => const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator())),
+      error: (e, _) => SliverToBoxAdapter(child: Text('Erro: $e')),
     );
   }
 
@@ -449,7 +483,7 @@ class HomeScreen extends ConsumerWidget {
                 boxShadow: [
                   BoxShadow(
                     blurRadius: 16,
-                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
                     offset: const Offset(0, 6),
                   ),
                 ],
@@ -462,40 +496,40 @@ class HomeScreen extends ConsumerWidget {
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
                     onTap: () => showCategoryExpensesSheet(context, cat, allExpenses),
-                leading: Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        blurRadius: 10,
-                        color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                        offset: const Offset(0, 4),
+                    leading: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            blurRadius: 10,
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                    ],
+                      child: Icon(Icons.credit_card_rounded, color: Theme.of(context).colorScheme.primary, size: 28),
+                    ),
+                    title: Text(cat.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        cat.dueDay != null ? 'Vencimento: Dia ${cat.dueDay}' : 'Vencimento não configurado',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    trailing: Text(
+                      'R\$ ${spent.toStringAsFixed(2)}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.w800, fontSize: 16),
+                    ),
                   ),
-                  child: Icon(Icons.credit_card_rounded, color: Theme.of(context).colorScheme.primary, size: 28),
-                ),
-                title: Text(cat.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    cat.dueDay != null ? 'Vencimento: Dia ${cat.dueDay}' : 'Vencimento não configurado',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-                  ),
-                ),
-                trailing: Text(
-                  'R\$ ${spent.toStringAsFixed(2)}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.w800, fontSize: 16),
                 ),
               ),
             ),
-          ),
-        ),
-      );
-    }).toList(),
+          );
+        }).toList(),
       ),
     );
   }
