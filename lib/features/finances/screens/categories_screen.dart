@@ -123,7 +123,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedType,
+                        initialValue: _selectedType,
                         items: _types.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
                         onChanged: (val) => setState(() => _selectedType = val!),
                         decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 8)),
@@ -219,7 +219,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                       },
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                          backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                           child: Icon(Icons.category, color: Theme.of(context).primaryColor),
                         ),
                         title: Text(cat.name),

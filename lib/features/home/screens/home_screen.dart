@@ -5,6 +5,12 @@ import '../../finances/models/category_model.dart';
 import '../../finances/models/expense_model.dart';
 import '../../finances/widgets/month_selector.dart';
 import '../../../core/services/groq_service.dart';
+import '../widgets/category_summary_card.dart';
+import '../widgets/category_expenses_sheet.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../auth/screens/profile_screen.dart';
+import 'notifications_screen.dart';
+import '../../auth/repositories/auth_repository.dart';
 
 final geminiInsightProvider = FutureProvider<String>((ref) async {
   final expenses = await ref.watch(currentMonthExpensesProvider.future);
@@ -12,7 +18,6 @@ final geminiInsightProvider = FutureProvider<String>((ref) async {
     return 'Adicione suas primeiras despesas para receber um insight financeiro.';
   }
 
-  // Agrupar por categoria e calcular total
   final summary = <String, Map<String, dynamic>>{};
   double totalGasto = 0.0;
   
@@ -37,343 +42,460 @@ final geminiInsightProvider = FutureProvider<String>((ref) async {
   return await groq.getFinancialInsight(promptData);
 });
 
+final expensesSummaryProvider = Provider<Map<String, double>>((ref) {
+  final expenses = ref.watch(currentMonthExpensesProvider).valueOrNull ?? [];
+  final summary = <String, double>{};
+  for (var e in expenses) {
+    if (e.categoryId != null) {
+      summary[e.categoryId!] = (summary[e.categoryId!] ?? 0) + e.effectiveAmount;
+    }
+  }
+  return summary;
+});
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    void showCategoryExpenses(CategoryModel cat, List<ExpenseModel> allExpenses) {
-      final catExpenses = allExpenses.where((e) => e.categoryId == cat.id).toList();
-      catExpenses.sort((a, b) => b.date.compareTo(a.date));
-
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        builder: (context) {
-          return DraggableScrollableSheet(
-            initialChildSize: 0.6,
-            maxChildSize: 0.9,
-            minChildSize: 0.4,
-            expand: false,
-            builder: (context, scrollController) {
-              return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      'Despesas: ${cat.name}',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: catExpenses.isEmpty
-                        ? const Center(child: Text('Nenhuma despesa registrada neste mês.'))
-                        : ListView.builder(
-                            controller: scrollController,
-                            itemCount: catExpenses.length,
-                            itemBuilder: (context, index) {
-                              final e = catExpenses[index];
-                              return ListTile(
-                                title: Text(e.description != null && e.description!.isNotEmpty ? e.description! : 'Sem descrição'),
-                                subtitle: Text('${e.date.day.toString().padLeft(2, '0')}/${e.date.month.toString().padLeft(2, '0')}/${e.date.year}'),
-                                trailing: Text(
-                                  'R\$ ${e.effectiveAmount.toStringAsFixed(2)}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
-    }
-
     final expensesAsync = ref.watch(currentMonthExpensesProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
     final insightAsync = ref.watch(geminiInsightProvider);
+    final summary = ref.watch(expensesSummaryProvider);
+    
+    final userAsync = ref.watch(currentUserProvider);
+    final userName = userAsync.valueOrNull?.name ?? 'Usuário';
+    final nameParts = userName.trim().split(' ');
+    final firstName = nameParts.isNotEmpty ? nameParts.first : 'Usuário';
+    
+    String initials = "U";
+    if (nameParts.length > 1) {
+      initials = "${nameParts[0][0]}${nameParts[1][0]}".toUpperCase();
+    } else if (nameParts.isNotEmpty && nameParts[0].isNotEmpty) {
+      initials = nameParts[0][0].toUpperCase();
+    }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Visão Geral')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const MonthSelector(),
-            const SizedBox(height: 16),
-            Card(
-              elevation: 4,
-              shadowColor: Colors.black12,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                padding: const EdgeInsets.all(24.0),
-                child: insightAsync.when(
-                  data: (insight) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.auto_awesome, color: Colors.amberAccent),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Insight da IA',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        insight,
-                        style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
-                      ),
-                    ],
-                  ),
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  ),
-                  error: (e, _) => Text(
-                    'Erro ao gerar insight: $e',
-                    style: const TextStyle(color: Colors.white),
-                  ),
+      body: SafeArea(
+        bottom: false,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 800),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, child) {
+            return Transform.translate(
+              offset: Offset(0, 40 * (1 - value)),
+              child: Opacity(
+                opacity: value,
+                child: child,
+              ),
+            );
+          },
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(child: _buildHeader(context, firstName, initials)),
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: MonthSelector(),
                 ),
               ),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              SliverToBoxAdapter(child: _buildInsightCard(context, insightAsync)),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              SliverToBoxAdapter(child: _buildSectionTitle(context, "Resumo Rápido", "💸")),
+              SliverToBoxAdapter(child: _buildQuickSummary(context, expensesAsync)),
+              categoriesAsync.when(
+                data: (categories) {
+                  final fixedCategories = categories.where((c) => c.type == 'fixa').toList();
+                  final creditCards = categories.where((c) => c.type == 'credito').toList();
+                  final benefits = categories.where((c) => c.type == 'beneficio').toList();
+                  final allExpenses = expensesAsync.valueOrNull ?? [];
+
+                  return SliverList(
+                    delegate: SliverChildListDelegate([
+                      if (fixedCategories.isNotEmpty) ...[
+                        _buildSectionTitle(context, "Acompanhamento de Limites", "📊"),
+                        _buildCategoryList(context, fixedCategories, summary, allExpenses, Theme.of(context).colorScheme.secondary),
+                      ],
+                      if (benefits.isNotEmpty) ...[
+                        _buildSectionTitle(context, "Benefícios", "🎁"),
+                        _buildCategoryList(context, benefits, summary, allExpenses, Theme.of(context).colorScheme.primary),
+                      ],
+                      if (creditCards.isNotEmpty) ...[
+                        _buildSectionTitle(context, "Faturas de Cartões", "💳"),
+                        _buildCreditCardsList(context, creditCards, summary, allExpenses),
+                      ],
+                      const SizedBox(height: 120), // Espaço pro BottomNavigationBar
+                    ]),
+                  );
+                },
+                loading: () => const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator())),
+                error: (e, _) => SliverToBoxAdapter(child: Text('Erro: $e')),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, String firstName, String initials) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const FractionallySizedBox(
+                  heightFactor: 0.85,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    child: ProfileScreen(),
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.primaryContainer],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    blurRadius: 16,
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(initials, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+              ),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Resumo Rápido',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Olá, $firstName 👋",
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(letterSpacing: -0.5, fontSize: 22),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Suas finanças em dia",
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            expensesAsync.when(
-              data: (expenses) {
-                final total = expenses.fold<double>(0, (sum, e) => sum + e.effectiveAmount);
-                return Card(
-                  child: ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: Color(0xFFEF4444),
-                      child: Icon(Icons.arrow_downward, color: Colors.white),
-                    ),
-                    title: const Text('Gastos deste Mês'),
-                    trailing: Text(
-                      'R\$ ${total.toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+            },
+            child: Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Theme.of(context).dividerColor),
+                boxShadow: [
+                  BoxShadow(
+                    blurRadius: 12,
+                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  Center(child: Icon(Icons.notifications_outlined, color: Theme.of(context).textTheme.bodyLarge?.color, size: 24)),
+                  Positioned(
+                    right: 12,
+                    top: 12,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary, 
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2),
+                      ),
                     ),
                   ),
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Text('Erro: $e'),
+                ],
+              ),
             ),
-            categoriesAsync.when(
-              data: (categories) {
-                final fixedCategories = categories.where((c) => c.type == 'fixa').toList();
-                final creditCards = categories.where((c) => c.type == 'credito').toList();
-                final benefits = categories.where((c) => c.type == 'beneficio').toList();
-                if (fixedCategories.isEmpty && creditCards.isEmpty && benefits.isEmpty) return const SizedBox.shrink();
+          ),
+        ],
+      ),
+    );
+  }
 
-                return expensesAsync.when(
-                  data: (expenses) {
-                    final summary = <String, double>{};
-                    for (var e in expenses) {
-                      final catId = e.categoryId;
-                      if (catId != null) {
-                        summary[catId] = (summary[catId] ?? 0) + e.effectiveAmount;
-                      }
-                    }
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: 24),
-                        Text(
-                          'Acompanhamento de Limites',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 16),
-                        ...fixedCategories.map((cat) {
-                          final spent = summary[cat.id] ?? 0.0;
-                          final fixed = cat.fixedValue;
-                          final percentage = (fixed != null && fixed > 0) ? (spent / fixed).clamp(0.0, 1.0) : 0.0;
-                          
-                          Color barColor = Colors.green;
-                          if (percentage >= 0.9) {
-                            barColor = Colors.red;
-                          } else if (percentage >= 0.7) {
-                            barColor = Colors.orange;
-                          }
-
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            child: InkWell(
-                              onTap: () => showCategoryExpenses(cat, expenses),
-                              borderRadius: BorderRadius.circular(12),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(cat.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                            if (cat.dueDay != null)
-                                              Text('Vencimento: Dia ${cat.dueDay}', style: const TextStyle(fontSize: 12, color: Colors.orange)),
-                                          ],
-                                        ),
-                                        if (fixed != null)
-                                          Text('${(percentage * 100).toStringAsFixed(0)}%', style: const TextStyle(color: Colors.black)),
-                                      ],
-                                    ),
-                                    if (fixed != null) ...[
-                                      const SizedBox(height: 8),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(4),
-                                        child: LinearProgressIndicator(
-                                          value: percentage,
-                                          backgroundColor: Colors.grey.shade200,
-                                          color: barColor,
-                                          minHeight: 8,
-                                        ),
-                                      ),
-                                    ],
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text('Gasto: R\$ ${spent.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                        if (fixed != null)
-                                          Text('Disponível: R\$ ${(fixed - spent).clamp(0.0, double.infinity).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        if (benefits.isNotEmpty) ...[
-                          const SizedBox(height: 24),
-                          Text(
-                            'Benefícios',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 16),
-                          ...benefits.map((cat) {
-                            final spent = summary[cat.id] ?? 0.0;
-                            final fixed = cat.fixedValue;
-                            final percentage = (fixed != null && fixed > 0) ? (spent / fixed).clamp(0.0, 1.0) : 0.0;
-                            
-                            Color barColor = Colors.blueAccent;
-                            if (percentage >= 0.9) {
-                              barColor = Colors.red;
-                            } else if (percentage >= 0.7) {
-                              barColor = Colors.orange;
-                            }
-
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: InkWell(
-                                onTap: () => showCategoryExpenses(cat, expenses),
-                                borderRadius: BorderRadius.circular(12),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(cat.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                          if (fixed != null)
-                                            Text('${(percentage * 100).toStringAsFixed(0)}%'),
-                                        ],
-                                      ),
-                                      if (fixed != null) ...[
-                                        const SizedBox(height: 8),
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(4),
-                                          child: LinearProgressIndicator(
-                                            value: percentage,
-                                            backgroundColor: Colors.grey.shade200,
-                                            color: barColor,
-                                            minHeight: 8,
-                                          ),
-                                        ),
-                                      ],
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text('Utilizado: R\$ ${spent.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                          if (fixed != null)
-                                            Text('Disponível: R\$ ${(fixed - spent).clamp(0.0, double.infinity).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ],
-                        if (creditCards.isNotEmpty) ...[
-                          const SizedBox(height: 24),
-                          Text(
-                            'Faturas de Cartões',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 16),
-                          ...creditCards.map((cat) {
-                            final spent = summary[cat.id] ?? 0.0;
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                onTap: () => showCategoryExpenses(cat, expenses),
-                                leading: const CircleAvatar(
-                                  backgroundColor: Colors.blueAccent,
-                                  child: Icon(Icons.credit_card, color: Colors.white),
-                                ),
-                                title: Text(cat.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Text(cat.dueDay != null ? 'Vencimento: Dia ${cat.dueDay}' : 'Vencimento não configurado'),
-                                trailing: Text(
-                                  'R\$ ${spent.toStringAsFixed(2)}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.redAccent),
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
-                      ],
-                    );
-                  },
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
-                );
-              },
-              loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
+  Widget _buildInsightCard(BuildContext context, AsyncValue<String> insightAsync) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: LinearGradient(
+            colors: [Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.primaryContainer],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 24,
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.4),
+              offset: const Offset(0, 12),
             ),
           ],
         ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -20,
+              top: -20,
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.1)),
+              ),
+            ),
+            Positioned(
+              left: -30,
+              bottom: -30,
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.08)),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: insightAsync.when(
+                data: (insight) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
+                          SizedBox(width: 6),
+                          Text(
+                            'Insight da IA',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      insight,
+                      style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.5, fontWeight: FontWeight.w600, letterSpacing: -0.2),
+                    ),
+                  ],
+                ),
+                loading: () => const Center(child: Padding(
+                  padding: EdgeInsets.all(32.0),
+                  child: CircularProgressIndicator(color: Colors.white),
+                )),
+                error: (e, _) => Text('Erro ao gerar insight: $e', style: const TextStyle(color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(BuildContext context, String title, String emoji) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 22)),
+          const SizedBox(width: 10),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+          ),
+          const Spacer(),
+          Text(
+            "Ver Tudo",
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.primary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickSummary(BuildContext context, AsyncValue<List<ExpenseModel>> expensesAsync) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return expensesAsync.when(
+      data: (expenses) {
+        final total = expenses.fold<double>(0, (sum, e) => sum + e.effectiveAmount);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Theme.of(context).dividerColor),
+              boxShadow: [
+                BoxShadow(
+                  blurRadius: 16,
+                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.error.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        blurRadius: 10,
+                        color: Theme.of(context).colorScheme.error.withOpacity(0.2),
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Icon(Icons.arrow_downward_rounded, color: Theme.of(context).colorScheme.error, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Gastos deste Mês', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Text(
+                        'R\$ ${total.toStringAsFixed(2)}',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -1),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Text('Erro: $e'),
+    );
+  }
+
+  Widget _buildCategoryList(BuildContext context, List<CategoryModel> categories, Map<String, double> summary, List<ExpenseModel> allExpenses, Color barColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: categories.map((cat) => CategorySummaryCard(
+          category: cat,
+          spent: summary[cat.id] ?? 0.0,
+          barColor: barColor,
+          onTap: () => showCategoryExpensesSheet(context, cat, allExpenses),
+        )).toList(),
+      ),
+    );
+  }
+
+  Widget _buildCreditCardsList(BuildContext context, List<CategoryModel> creditCards, Map<String, double> summary, List<ExpenseModel> allExpenses) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: creditCards.map((cat) {
+          final spent = summary[cat.id] ?? 0.0;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Theme.of(context).dividerColor),
+                boxShadow: [
+                  BoxShadow(
+                    blurRadius: 16,
+                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(24),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () => showCategoryExpensesSheet(context, cat, allExpenses),
+                leading: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        blurRadius: 10,
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Icon(Icons.credit_card_rounded, color: Theme.of(context).colorScheme.primary, size: 28),
+                ),
+                title: Text(cat.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    cat.dueDay != null ? 'Vencimento: Dia ${cat.dueDay}' : 'Vencimento não configurado',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                  ),
+                ),
+                trailing: Text(
+                  'R\$ ${spent.toStringAsFixed(2)}',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }).toList(),
       ),
     );
   }

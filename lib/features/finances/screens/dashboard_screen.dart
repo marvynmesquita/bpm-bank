@@ -61,7 +61,7 @@ class DashboardScreen extends ConsumerWidget {
                 Expanded(
                   child: ListView.separated(
                     itemCount: expenses.length,
-                    separatorBuilder: (_, __) => const Divider(),
+                    separatorBuilder: (_, _) => const Divider(),
                     itemBuilder: (context, index) {
                       final expense = expenses[index];
                       return Dismissible(

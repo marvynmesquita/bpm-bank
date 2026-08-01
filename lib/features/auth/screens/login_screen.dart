@@ -71,12 +71,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Icon(
                   Icons.account_balance_wallet_rounded,
                   size: 64,
-                  color: Theme.of(context).primaryColor,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(height: 32),
                 Text(
                   _isLogin ? 'Bem-vindo de volta' : 'Crie sua conta',
-                  style: Theme.of(context).textTheme.displayMedium,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),

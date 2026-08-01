@@ -225,6 +225,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
                   onPressed: () async {
+                    Navigator.of(context).pop();
                     await ref.read(authRepositoryProvider).signOut();
                   },
                   icon: const Icon(Icons.logout, color: Colors.red),

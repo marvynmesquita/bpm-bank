@@ -5,7 +5,6 @@ import 'package:rxdart/rxdart.dart';
 import '../models/category_model.dart';
 import '../models/expense_model.dart';
 import '../models/loan_model.dart';
-import '../models/loan_model.dart';
 import '../../auth/repositories/auth_repository.dart';
 import '../../../core/services/notification_service.dart';
 
@@ -139,27 +138,17 @@ class FinancesRepository {
     final now = baseDate ?? DateTime.now();
     DateTime start, end;
 
-    int daysInMonth(int year, int month) => DateTime(year, month + 1, 0).day;
     int safeDay(int year, int month, int day) {
-      final max = daysInMonth(year, month);
+      final max = DateTime(year, month + 1, 0).day;
       return day > max ? max : day;
     }
 
     if (now.day >= payDay) {
       start = DateTime(now.year, now.month, safeDay(now.year, now.month, payDay));
-      final endMonth = now.month + 1;
-      final endYear = endMonth > 12 ? now.year + 1 : now.year;
-      final eMonth = endMonth > 12 ? 1 : endMonth;
-      final nextPayDay = safeDay(endYear, eMonth, payDay);
-      end = DateTime(endYear, eMonth, nextPayDay).subtract(const Duration(days: 1));
+      end = DateTime(now.year, now.month + 1, safeDay(now.year, now.month + 1, payDay)).subtract(const Duration(days: 1));
     } else {
-      final startMonth = now.month - 1;
-      final startYear = startMonth < 1 ? now.year - 1 : now.year;
-      final sMonth = startMonth < 1 ? 12 : startMonth;
-      start = DateTime(startYear, sMonth, safeDay(startYear, sMonth, payDay));
-      
-      final nextPayDay = safeDay(now.year, now.month, payDay);
-      end = DateTime(now.year, now.month, nextPayDay).subtract(const Duration(days: 1));
+      start = DateTime(now.year, now.month - 1, safeDay(now.year, now.month - 1, payDay));
+      end = DateTime(now.year, now.month, safeDay(now.year, now.month, payDay)).subtract(const Duration(days: 1));
     }
 
     final startStr = start.toIso8601String().split('T').first;
@@ -218,15 +207,12 @@ class FinancesRepository {
 
     return Rx.combineLatest2(currentMonthStream, pastRecurringStream, 
       (List<ExpenseModel> current, List<ExpenseModel> pastRecurring) {
-        final all = [...current, ...pastRecurring];
         // Evita duplicatas se uma despesa recorrente foi criada neste mês (já estará em currentMonth)
-        final uniqueMap = <String, ExpenseModel>{};
-        for (var e in all) {
-          uniqueMap[e.id] = e;
-        }
-        final result = uniqueMap.values.toList();
-        result.sort((a, b) => b.date.compareTo(a.date));
-        return result;
+        final uniqueMap = {
+          for (final e in pastRecurring) e.id: e,
+          for (final e in current) e.id: e,
+        };
+        return uniqueMap.values.toList()..sort((a, b) => b.date.compareTo(a.date));
       });
   }
 

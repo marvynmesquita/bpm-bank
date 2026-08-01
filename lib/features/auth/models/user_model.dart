@@ -17,7 +17,7 @@ class UserModel {
     this.partnerEmail,
     this.partnerUid,
     this.payDay,
-  }) : this.createdAt = createdAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now();
 
   factory UserModel.fromJson(Map<String, dynamic> json, String documentId) {
     return UserModel(

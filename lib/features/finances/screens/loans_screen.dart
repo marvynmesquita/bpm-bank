@@ -208,9 +208,7 @@ class LoansScreen extends ConsumerWidget {
                                             ),
                                             title: Text('Valor: R\$ ${loan.amount.toStringAsFixed(2)}'),
                                             subtitle: Text(
-                                              (cardName.isNotEmpty ? 'Cartão: $cardName\n' : '') +
-                                              'Data: ${loan.date.day.toString().padLeft(2, '0')}/${loan.date.month.toString().padLeft(2, '0')}/${loan.date.year}'
-                                              '${loan.totalInstallments > 1 ? '\nParcela ${loan.currentInstallment}/${loan.totalInstallments}' : ''}'
+                                              '${cardName.isNotEmpty ? 'Cartão: $cardName\n' : ''}Data: ${loan.date.day.toString().padLeft(2, '0')}/${loan.date.month.toString().padLeft(2, '0')}/${loan.date.year}${loan.totalInstallments > 1 ? '\nParcela ${loan.currentInstallment}/${loan.totalInstallments}' : ''}'
                                             ),
                                             trailing: Column(
                                               mainAxisAlignment: MainAxisAlignment.center,

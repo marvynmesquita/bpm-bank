@@ -138,7 +138,7 @@ class _AddLoanScreenState extends ConsumerState<AddLoanScreen> {
                   }
                   
                   return DropdownButtonFormField<String>(
-                    value: _selectedCategoryId,
+                    initialValue: _selectedCategoryId,
                     hint: const Text('Cartão Utilizado'),
                     items: creditCards.map((c) => DropdownMenuItem(
                       value: c.id,
