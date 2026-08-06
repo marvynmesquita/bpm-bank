@@ -14,20 +14,36 @@ FLUTTER_STORAGE_URL="https://storage.googleapis.com/flutter_infra_release/releas
 mkdir -p "$CACHE_DIR"
 
 echo ""
+echo "=== Configurando git para evitar dubious ownership ==="
+export GIT_CONFIG_GLOBAL="$CACHE_DIR/.gitconfig"
+{
+  echo "[safe]"
+  echo "    directory = *"
+} > "$GIT_CONFIG_GLOBAL"
+echo "Git safe.directory=* configurado."
+
+echo ""
 echo "=== Verificando cache do Flutter ==="
+NEEDS_INSTALL=0
 if [ -d "$FLUTTER_DIR/bin" ] && [ -x "$FLUTTER_DIR/bin/flutter" ]; then
-  INSTALLED_VERSION=$("$FLUTTER_DIR/bin/flutter" --version --machine | grep '"frameworkVersion"' | sed 's/.*"frameworkVersion": "\(.*\)".*/\1/')
+  if [ -f "$FLUTTER_DIR/version" ]; then
+    INSTALLED_VERSION=$(cat "$FLUTTER_DIR/version" | tr -d '[:space:]')
+  else
+    INSTALLED_VERSION="unknown"
+  fi
   echo "Flutter já instalado (cache): $INSTALLED_VERSION"
   if [ "$INSTALLED_VERSION" != "$FLUTTER_VERSION" ]; then
     echo "Versão desatualizada. Re-instalando..."
     rm -rf "$FLUTTER_DIR"
+    NEEDS_INSTALL=1
   fi
+else
+  NEEDS_INSTALL=1
 fi
 
-if [ ! -d "$FLUTTER_DIR/bin" ] || [ ! -x "$FLUTTER_DIR/bin/flutter" ]; then
+if [ "$NEEDS_INSTALL" -eq 1 ]; then
   echo "Baixando Flutter SDK $FLUTTER_VERSION ($FLUTTER_CHANNEL)..."
   OS="linux"
-  ARCH="x64"
   FLUTTER_ARTIFACT="flutter_${OS}_${FLUTTER_VERSION}-${FLUTTER_CHANNEL}.tar.xz"
   DOWNLOAD_URL="${FLUTTER_STORAGE_URL}/${FLUTTER_CHANNEL}/${OS}/${FLUTTER_ARTIFACT}"
 
@@ -35,27 +51,38 @@ if [ ! -d "$FLUTTER_DIR/bin" ] || [ ! -x "$FLUTTER_DIR/bin/flutter" ]; then
   curl -fSL --retry 3 --retry-delay 2 "$DOWNLOAD_URL" -o "$CACHE_DIR/flutter.tar.xz"
 
   echo "Extraindo..."
-  mkdir -p "$FLUTTER_DIR"
-  tar -xf "$CACHE_DIR/flutter.tar.xz" -C "$FLUTTER_DIR" --strip-components=1
+  TMP_EXTRACT="$CACHE_DIR/flutter-tmp"
+  rm -rf "$TMP_EXTRACT"
+  mkdir -p "$TMP_EXTRACT"
+  tar -xf "$CACHE_DIR/flutter.tar.xz" -C "$TMP_EXTRACT" --no-same-owner
   rm -f "$CACHE_DIR/flutter.tar.xz"
 
-  echo "Instalando..."
+  echo "Ajustando ownership e removendo .git do SDK..."
+  mv "$TMP_EXTRACT/flutter" "$FLUTTER_DIR"
+  rm -rf "$TMP_EXTRACT"
+  rm -rf "$FLUTTER_DIR/.git"
+
+  echo "Flutter $FLUTTER_VERSION instalado!"
 else
   echo "Usando Flutter do cache!"
 fi
 
-echo "=== Configurando PATH ==="
+echo "=== Configurando PATH e variáveis do Flutter ==="
 export PATH="$FLUTTER_DIR/bin:$FLUTTER_DIR/bin/cache/dart-sdk/bin:$PATH"
 export PUB_CACHE="$CACHE_DIR/pub-cache"
+export FLUTTER_ROOT="$FLUTTER_DIR"
 mkdir -p "$PUB_CACHE"
 
+echo "Desativando analytics e animações do Flutter CLI..."
+"$FLUTTER_DIR/bin/flutter" config --no-analytics --no-cli-animations 2>/dev/null || true
+
 echo "Flutter version:"
-flutter --version
+"$FLUTTER_DIR/bin/flutter" --version --machine | head -c 200 ; echo ""
 
 echo ""
 echo "=== Instalando dependências (flutter pub get) ==="
 cd "$(dirname "$0")"
-flutter pub get
+"$FLUTTER_DIR/bin/flutter" pub get
 
 echo ""
 echo "=== Gerando arquivo .env ==="
@@ -66,11 +93,11 @@ ENV_FILE="$(dirname "$0")/.env"
   echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-placeholder}"
   echo "SUPABASE_PASSWORD=${SUPABASE_PASSWORD:-placeholder}"
 } > "$ENV_FILE"
-echo ".env criado com sucesso em $ENV_FILE"
+echo ".env criado com sucesso."
 
 echo ""
 echo "=== Compilando para Web ==="
-flutter build web --release --dart-define-from-file=.env --no-tree-shake-icons
+"$FLUTTER_DIR/bin/flutter" build web --release --dart-define-from-file=.env --no-tree-shake-icons
 
 echo ""
 echo "=== Build finalizado! ==="
