@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../repositories/auth_repository.dart';
 import '../../finances/screens/categories_screen.dart';
+import '../../../core/services/update_service.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -16,6 +17,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _partnerEmailController = TextEditingController();
   bool _isLoading = false;
   bool _isLoadingPartner = false;
+  bool _isCheckingUpdate = false;
 
   @override
   void dispose() {
@@ -84,6 +86,47 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
     } finally {
       if (mounted) setState(() => _isLoadingPartner = false);
+    }
+  }
+
+  Future<void> _checkUpdates() async {
+    setState(() => _isCheckingUpdate = true);
+    bool found = false;
+    
+    await UpdateService().checkForUpdates(
+      onUpdateAvailable: (newVersion, url) {
+        found = true;
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Atualização Disponível'),
+            content: Text('A versão $newVersion já está disponível para download.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Agora não'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  UpdateService().downloadUpdate(url);
+                },
+                child: const Text('Baixar'),
+              ),
+            ],
+          ),
+        );
+      }
+    );
+
+    if (mounted) {
+      setState(() => _isCheckingUpdate = false);
+      if (!found) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('O aplicativo já está na versão mais recente.')),
+        );
+      }
     }
   }
 
@@ -220,6 +263,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     side: const BorderSide(color: Colors.blue),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: _isCheckingUpdate ? null : _checkUpdates,
+                  icon: _isCheckingUpdate 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.system_update_alt, color: Colors.purple),
+                  label: const Text('Verificar Atualizações', style: TextStyle(color: Colors.purple)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: const BorderSide(color: Colors.purple),
                   ),
                 ),
                 const SizedBox(height: 16),

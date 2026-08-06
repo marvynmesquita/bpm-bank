@@ -21,6 +21,7 @@ final geminiInsightProvider = FutureProvider<String>((ref) async {
   double totalGasto = 0.0;
   
   for (var e in expenses) {
+    if (e.isIncome) continue;
     final catName = e.category?.name ?? 'Outros';
     final type = e.category?.type ?? 'outros';
     
@@ -45,6 +46,7 @@ final expensesSummaryProvider = Provider<Map<String, double>>((ref) {
   final expenses = ref.watch(currentMonthExpensesProvider).valueOrNull ?? [];
   final summary = <String, double>{};
   for (var e in expenses) {
+    if (e.isIncome) continue;
     if (e.categoryId != null) {
       summary[e.categoryId!] = (summary[e.categoryId!] ?? 0) + e.effectiveAmount;
     }
@@ -349,57 +351,97 @@ class _QuickSummaryWidget extends ConsumerWidget {
     
     return expensesAsync.when(
       data: (expenses) {
-        final total = expenses.fold<double>(0, (sum, e) => sum + e.effectiveAmount);
+        final totalGastos = expenses.where((e) => !e.isIncome).fold<double>(0, (sum, e) => sum + e.effectiveAmount);
+        final totalRenda = expenses.where((e) => e.isIncome).fold<double>(0, (sum, e) => sum + e.effectiveAmount);
+        
         return Padding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Theme.of(context).dividerColor),
-              boxShadow: [
-                BoxShadow(
-                  blurRadius: 16,
-                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.error.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(18),
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Theme.of(context).dividerColor),
                     boxShadow: [
                       BoxShadow(
-                        blurRadius: 10,
-                        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.2),
-                        offset: const Offset(0, 4),
+                        blurRadius: 16,
+                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+                        offset: const Offset(0, 6),
                       ),
                     ],
                   ),
-                  child: Icon(Icons.arrow_downward_rounded, color: Theme.of(context).colorScheme.error, size: 28),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Gastos deste Mês', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(Icons.arrow_downward_rounded, color: Theme.of(context).colorScheme.error, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Text('Gastos', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
                       Text(
-                        'R\$ ${total.toStringAsFixed(2)}',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -1),
+                        'R\$ ${totalGastos.toStringAsFixed(2)}',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -1),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Theme.of(context).dividerColor),
+                    boxShadow: [
+                      BoxShadow(
+                        blurRadius: 16,
+                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.arrow_upward_rounded, color: Colors.green, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Text('Renda', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'R\$ ${totalRenda.toStringAsFixed(2)}',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -1),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },

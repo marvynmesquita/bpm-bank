@@ -21,6 +21,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   String? _selectedCategoryId;
   bool _isShared = false;
   bool _isRecurring = false;
+  bool _isIncome = false;
   bool _isLoading = false;
   DateTime _selectedDate = DateTime.now();
 
@@ -29,12 +30,17 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     super.initState();
     if (widget.expense != null) {
       final e = widget.expense!;
-      _amountController.text = e.amount.toStringAsFixed(2);
-      _descController.text = e.description ?? '';
+      if (e.totalInstallments > 1) {
+        _amountController.text = (e.amount * e.totalInstallments).toStringAsFixed(2);
+      } else {
+        _amountController.text = e.amount.toStringAsFixed(2);
+      }
+      _descController.text = (e.description ?? '').replaceAll(RegExp(r'\s*\(\d+/\d+\)$'), '');
       _installmentsController.text = e.totalInstallments.toString();
       _selectedCategoryId = e.categoryId;
       _isShared = e.sharedWithUserId != null;
       _isRecurring = e.isRecurring;
+      _isIncome = e.isIncome;
       _selectedDate = e.date;
     }
   }
@@ -87,24 +93,45 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           date: _selectedDate,
           sharedWithUserId: _isShared ? partnerUid : null, 
           isRecurring: _isRecurring,
+          isIncome: _isIncome,
         );
         await ref.read(financesRepositoryProvider).addExpense(newExpense, installments: installments);
       } else {
         // Editar despesa
-        final updatedExpense = ExpenseModel(
-          id: widget.expense!.id,
-          userId: userId,
-          amount: amount,
-          description: _descController.text,
-          categoryId: _selectedCategoryId,
-          date: _selectedDate,
-          sharedWithUserId: _isShared ? partnerUid : null, 
-          isRecurring: _isRecurring,
-          isPaid: widget.expense!.isPaid,
-          currentInstallment: widget.expense!.currentInstallment,
-          totalInstallments: widget.expense!.totalInstallments,
-        );
-        await ref.read(financesRepositoryProvider).updateExpense(updatedExpense);
+        final e = widget.expense!;
+        if (e.totalInstallments <= 1 && installments > 1) {
+          // Changed from 1 installment (or recurring) to multiple installments
+          await ref.read(financesRepositoryProvider).deleteExpense(e.id);
+          final newExpense = ExpenseModel(
+            id: '',
+            userId: userId,
+            amount: amount,
+            description: _descController.text,
+            categoryId: _selectedCategoryId,
+            date: _selectedDate,
+            sharedWithUserId: _isShared ? partnerUid : null, 
+            isRecurring: false, // Se tem parcelas, não é assinatura infinita
+            isIncome: _isIncome,
+          );
+          await ref.read(financesRepositoryProvider).addExpense(newExpense, installments: installments);
+        } else {
+          final updatedExpense = ExpenseModel(
+            id: e.id,
+            userId: userId,
+            amount: amount,
+            description: _descController.text,
+            categoryId: _selectedCategoryId,
+            date: _selectedDate,
+            sharedWithUserId: _isShared ? partnerUid : null, 
+            isRecurring: _isRecurring,
+            isIncome: _isIncome,
+            isPaid: e.isPaid,
+            groupId: e.groupId,
+            currentInstallment: e.currentInstallment,
+            totalInstallments: e.totalInstallments,
+          );
+          await ref.read(financesRepositoryProvider).updateExpense(updatedExpense);
+        }
       }
 
       ref.invalidate(currentMonthExpensesProvider);
@@ -123,19 +150,70 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     }
   }
 
+  Future<void> _deleteExpense(String id) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir Registro'),
+        content: const Text('Tem certeza que deseja apagar?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Excluir', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(financesRepositoryProvider).deleteExpense(id);
+      ref.invalidate(currentMonthExpensesProvider);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao excluir: $e')));
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesProvider);
     final isEditing = widget.expense != null;
 
     return Scaffold(
-      appBar: AppBar(title: Text(isEditing ? 'Editar Despesa' : 'Nova Despesa')),
+      appBar: AppBar(
+        title: Text(isEditing ? 'Editar Registro' : 'Nova Adição'),
+        actions: [
+          if (isEditing)
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () => _deleteExpense(widget.expense!.id),
+            ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (!isEditing)
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: false, label: Text('Despesa', style: TextStyle(fontSize: 13)), icon: Icon(Icons.arrow_downward, size: 18)),
+                    ButtonSegment(value: true, label: Text('Renda Extra', style: TextStyle(fontSize: 13)), icon: Icon(Icons.arrow_upward, size: 18)),
+                  ],
+                  selected: {_isIncome},
+                  onSelectionChanged: (Set<bool> newSelection) {
+                    setState(() {
+                      _isIncome = newSelection.first;
+                    });
+                  },
+                ),
+              if (!isEditing) const SizedBox(height: 16),
               TextField(
                 controller: _amountController,
                 decoration: const InputDecoration(labelText: 'Valor (R\$)'),
@@ -172,7 +250,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 controller: _installmentsController,
                 decoration: const InputDecoration(labelText: 'Parcelas'),
                 keyboardType: TextInputType.number,
-                enabled: !isEditing, // Não permitimos editar parcelas depois de criado para simplificar
+                enabled: !isEditing || widget.expense!.totalInstallments <= 1,
               ),
               const SizedBox(height: 16),
               categoriesAsync.when(

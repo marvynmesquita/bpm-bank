@@ -48,8 +48,8 @@ class _MainLayoutState extends State<MainLayout> {
     } else if (_currentIndex == 0 || _currentIndex == 1) {
       return _customFAB(
         context: context,
-        label: 'Despesa',
-        icon: Icons.money_off_rounded,
+        label: 'Nova Adição',
+        icon: Icons.add_circle_outline_rounded,
         gradient: LinearGradient(
           colors: [Theme.of(context).colorScheme.primaryContainer, Theme.of(context).colorScheme.primary],
         ),

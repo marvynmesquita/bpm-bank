@@ -19,6 +19,7 @@ class _AddLoanScreenState extends ConsumerState<AddLoanScreen> {
   final _installmentsController = TextEditingController(text: '1');
   String? _selectedCategoryId;
   bool _isPaid = false;
+  bool _isRecurring = false;
   bool _isLoading = false;
   DateTime _selectedDate = DateTime.now();
 
@@ -28,9 +29,14 @@ class _AddLoanScreenState extends ConsumerState<AddLoanScreen> {
     if (widget.loan != null) {
       final l = widget.loan!;
       _borrowerController.text = l.borrowerName;
-      _amountController.text = l.amount.toStringAsFixed(2);
+      if (l.totalInstallments > 1) {
+        _amountController.text = (l.amount * l.totalInstallments).toStringAsFixed(2);
+      } else {
+        _amountController.text = l.amount.toStringAsFixed(2);
+      }
       _selectedCategoryId = l.categoryId;
       _isPaid = l.isPaid;
+      _isRecurring = l.isRecurring;
       _selectedDate = l.date;
     }
   }
@@ -69,19 +75,37 @@ class _AddLoanScreenState extends ConsumerState<AddLoanScreen> {
           categoryId: _selectedCategoryId!,
           date: _selectedDate,
           isPaid: _isPaid,
+          isRecurring: _isRecurring,
         );
         await ref.read(financesRepositoryProvider).addLoan(newLoan, installments: installments);
       } else {
-        final updatedLoan = LoanModel(
-          id: widget.loan!.id,
-          userId: userId,
-          borrowerName: borrower,
-          amount: amount,
-          categoryId: _selectedCategoryId!,
-          date: _selectedDate,
-          isPaid: _isPaid,
-        );
-        await ref.read(financesRepositoryProvider).updateLoan(updatedLoan);
+        final l = widget.loan!;
+        if (l.totalInstallments <= 1 && installments > 1) {
+          await ref.read(financesRepositoryProvider).deleteLoan(l.id);
+          final newLoan = LoanModel(
+            id: '',
+            userId: userId,
+            borrowerName: borrower,
+            amount: amount,
+            categoryId: _selectedCategoryId!,
+            date: _selectedDate,
+            isPaid: _isPaid,
+            isRecurring: false,
+          );
+          await ref.read(financesRepositoryProvider).addLoan(newLoan, installments: installments);
+        } else {
+          final updatedLoan = LoanModel(
+            id: l.id,
+            userId: userId,
+            borrowerName: borrower,
+            amount: amount,
+            categoryId: _selectedCategoryId!,
+            date: _selectedDate,
+            isPaid: _isPaid,
+            isRecurring: _isRecurring,
+          );
+          await ref.read(financesRepositoryProvider).updateLoan(updatedLoan);
+        }
       }
       
       if (mounted) {
@@ -123,13 +147,13 @@ class _AddLoanScreenState extends ConsumerState<AddLoanScreen> {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
               const SizedBox(height: 16),
-              if (!isEditing)
+              if (!isEditing || widget.loan!.totalInstallments <= 1)
                 TextField(
                   controller: _installmentsController,
                   decoration: const InputDecoration(labelText: 'Parcelas'),
                   keyboardType: TextInputType.number,
                 ),
-              if (!isEditing) const SizedBox(height: 16),
+              if (!isEditing || widget.loan!.totalInstallments <= 1) const SizedBox(height: 16),
               categoriesAsync.when(
                 data: (categories) {
                   final creditCards = categories.where((c) => c.type == 'credito').toList();
@@ -175,6 +199,12 @@ class _AddLoanScreenState extends ConsumerState<AddLoanScreen> {
                 title: const Text('Empréstimo já foi pago?'),
                 value: _isPaid,
                 onChanged: (val) => setState(() => _isPaid = val),
+                contentPadding: EdgeInsets.zero,
+              ),
+              SwitchListTile(
+                title: const Text('Empréstimo Recorrente?'),
+                value: _isRecurring,
+                onChanged: (val) => setState(() => _isRecurring = val),
                 contentPadding: EdgeInsets.zero,
               ),
               const SizedBox(height: 32),
