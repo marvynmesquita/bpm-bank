@@ -1,0 +1,90 @@
+name: Flutter CI (PR & Branches)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'feature/**'
+      - 'hotfix/**'
+      - 'release/**'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Analyze · Format · Tests · Build Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.44.2'
+          cache: true
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+          cache-path: '${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:'
+
+      - name: Cache Pub packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            ${{ runner.tool_cache }}/flutter/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: flutter doctor
+        run: flutter doctor -v
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Check formatting (dart format)
+        run: |
+          dart format --output=none --set-exit-if-changed \
+            $(find lib test -name "*.dart" -not -name "*.g.dart" -not -name "*.freezed.dart" 2>/dev/null) \
+            || echo "AVISO: formatacao divergente (mantendo workflow em aviso apenas)"
+
+      - name: flutter analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Unit tests (flutter test)
+        run: |
+          if [ -d "test" ] && find test -name "*_test.dart" | read -r _; then
+            flutter test --coverage --coverage-path=coverage/lcov.info
+          else
+            echo "Sem testes unitarios - pulando."
+          fi
+
+      - name: Create .env (placeholders)
+        run: |
+          cat > .env <<EOF
+          GROQ_API_KEY=${{ secrets.GROQ_API_KEY || 'placeholder' }}
+          SUPABASE_URL=${{ secrets.SUPABASE_URL || 'placeholder' }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY || 'placeholder' }}
+          SUPABASE_PASSWORD=${{ secrets.SUPABASE_PASSWORD || 'placeholder' }}
+          EOF
+          echo "OK"
+
+      - name: Build Web
+        run: flutter build web --release --dart-define-from-file=.env
+
+      - name: Upload Web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bpm-bank-web-${{ github.sha }}
+          path: build/web
+          retention-days: 7

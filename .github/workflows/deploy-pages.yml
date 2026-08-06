@@ -1,0 +1,89 @@
+name: Deploy Web to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-web:
+    name: Build Flutter Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.44.2'
+          cache: true
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+          cache-path: '${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:'
+
+      - name: Cache Pub packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            ${{ runner.tool_cache }}/flutter/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Create .env (real secrets if available)
+        run: |
+          cat > .env <<EOF
+          GROQ_API_KEY=${{ secrets.GROQ_API_KEY || 'placeholder' }}
+          SUPABASE_URL=${{ secrets.SUPABASE_URL || 'placeholder' }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY || 'placeholder' }}
+          SUPABASE_PASSWORD=${{ secrets.SUPABASE_PASSWORD || 'placeholder' }}
+          EOF
+
+      - name: Build Web (with base href "/" and --release)
+        run: flutter build web --release --dart-define-from-file=.env --base-href "/"
+
+      - name: Rewrites + SPA fix in Pages static server
+        run: |
+          cd build/web
+          # Copy index.html to 404.html so any deep link falls back to SPA
+          cp index.html 404.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: github-pages
+          path: build/web
+          retention-days: 30
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build-web
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages
