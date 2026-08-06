@@ -27,8 +27,15 @@ jobs:
     - name: Get dependencies
       run: flutter pub get
 
+    - name: Create .env file
+      run: |
+        echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" >> .env
+        echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
+        echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+        echo "SUPABASE_PASSWORD=${{ secrets.SUPABASE_PASSWORD }}" >> .env
+
     - name: Build APK
-      run: flutter build apk --release
+      run: flutter build apk --release --dart-define-from-file=.env
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
