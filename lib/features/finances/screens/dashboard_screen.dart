@@ -122,7 +122,7 @@ class _ExpensesListWidgetState extends ConsumerState<_ExpensesListWidget> {
               Expanded(
                 child: ListView.separated(
                   itemCount: filteredExpenses.length,
-                  separatorBuilder: (_, _) => const Divider(),
+                  separatorBuilder: (context, index) => const Divider(),
                   itemBuilder: (context, index) {
                     final expense = filteredExpenses[index];
                     return Dismissible(

@@ -91,42 +91,60 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Future<void> _checkUpdates() async {
     setState(() => _isCheckingUpdate = true);
-    bool found = false;
-    
-    await UpdateService().checkForUpdates(
-      onUpdateAvailable: (newVersion, url) {
-        found = true;
-        if (!mounted) return;
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Atualização Disponível'),
-            content: Text('A versão $newVersion já está disponível para download.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Agora não'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  UpdateService().downloadUpdate(url);
-                },
-                child: const Text('Baixar'),
-              ),
-            ],
-          ),
-        );
-      }
-    );
 
-    if (mounted) {
-      setState(() => _isCheckingUpdate = false);
-      if (!found) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('O aplicativo já está na versão mais recente.')),
-        );
-      }
+    final service = UpdateService();
+    final result = await service.checkForUpdatesFull();
+
+    if (!mounted) return;
+    setState(() => _isCheckingUpdate = false);
+
+    if (result.status == UpdateStatus.error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível verificar atualizações. Verifique sua conexão e tente novamente.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (result.hasUpdate &&
+        result.latestVersion != null &&
+        result.downloadUrl != null) {
+      final latest = result.latestVersion!;
+      final url = result.downloadUrl!;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Atualização Disponível'),
+          content: Text(
+            'Uma nova versão ($latest) já está disponível!\n\n'
+            'Sua versão atual: ${result.currentVersion}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Agora não'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                service.downloadUpdate(url);
+              },
+              child: const Text('Baixar'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Você já está usando a versão mais recente (${result.currentVersion}).',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
   }
 

@@ -5,6 +5,7 @@ import 'home_screen.dart';
 import '../../organization/screens/organization_screen.dart';
 import '../../finances/screens/loans_screen.dart';
 import '../../finances/screens/add_loan_screen.dart';
+import '../../../core/services/update_service.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -15,6 +16,7 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
+  bool _showedUpdateDialog = false;
 
   final List<Widget> _screens = [
     const HomeScreen(),
@@ -22,6 +24,55 @@ class _MainLayoutState extends State<MainLayout> {
     const OrganizationScreen(),
     const LoansScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkUpdatesSilently();
+    });
+  }
+
+  Future<void> _checkUpdatesSilently() async {
+    if (_showedUpdateDialog || !mounted) return;
+    final result = await UpdateService().checkForUpdatesFull();
+    if (!mounted) return;
+    if (result.status == UpdateStatus.success &&
+        result.hasUpdate &&
+        result.latestVersion != null &&
+        result.downloadUrl != null) {
+      _showedUpdateDialog = true;
+      _showUpdateDialog(result.latestVersion!, result.downloadUrl!, result.currentVersion);
+    }
+  }
+
+  void _showUpdateDialog(String newVersion, String url, String currentVersion) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Nova versão disponível'),
+        content: Text(
+          'A versão $newVersion já está disponível para download.\n\n'
+          'Sua versão atual: $currentVersion\n\n'
+          'Recomendamos atualizar para ter as últimas funcionalidades e correções.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Mais tarde'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              UpdateService().downloadUpdate(url);
+            },
+            child: const Text('Atualizar agora'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

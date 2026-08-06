@@ -63,7 +63,7 @@ class BPMBankApp extends ConsumerWidget {
           body: Center(child: CircularProgressIndicator()),
         ),
         error: (e, _) => Scaffold(
-          body: Center(child: Text('Erro: \$e')),
+          body: Center(child: Text('Erro: $e')),
         ),
       ),
     );
