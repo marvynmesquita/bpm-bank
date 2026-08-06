@@ -5,7 +5,7 @@ echo "=== BPM Bank - Build para Vercel ==="
 echo "PWD: $(pwd)"
 echo "VERCEL_CACHE_DIR: ${VERCEL_CACHE_DIR:-<undefined>}"
 
-FLUTTER_VERSION="3.24.3"
+FLUTTER_VERSION="3.44.2"
 FLUTTER_CHANNEL="stable"
 CACHE_DIR="${VERCEL_CACHE_DIR:-$(pwd)/.vercel_cache}"
 FLUTTER_DIR="$CACHE_DIR/flutter-sdk"
