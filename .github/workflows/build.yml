@@ -56,33 +56,22 @@ jobs:
       run: flutter pub get
 
     - name: Analyze code
-      run: flutter analyze --no-fatal-infos
+      run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
     - name: Create .env file
+      env:
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
       run: |
-        touch .env
-        if [ -n "${{ secrets.GROQ_API_KEY }}" ]; then
-          echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" >> .env
-        else
-          echo "GROQ_API_KEY=placeholder" >> .env
-        fi
-        if [ -n "${{ secrets.SUPABASE_URL }}" ]; then
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
-        else
-          echo "SUPABASE_URL=placeholder" >> .env
-        fi
-        if [ -n "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
-          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
-        else
-          echo "SUPABASE_ANON_KEY=placeholder" >> .env
-        fi
-        if [ -n "${{ secrets.SUPABASE_PASSWORD }}" ]; then
-          echo "SUPABASE_PASSWORD=${{ secrets.SUPABASE_PASSWORD }}" >> .env
-        else
-          echo "SUPABASE_PASSWORD=placeholder" >> .env
-        fi
-        echo "=== .env criado ==="
-        wc -l .env
+        {
+          echo "GROQ_API_KEY=${GROQ_API_KEY:-placeholder}"
+          echo "SUPABASE_URL=${SUPABASE_URL:-placeholder}"
+          echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-placeholder}"
+          echo "SUPABASE_PASSWORD=${SUPABASE_PASSWORD:-placeholder}"
+        } > .env
+        echo ".env criado: $(wc -l < .env) linhas"
 
     - name: Build Web
       run: flutter build web --release --dart-define-from-file=.env

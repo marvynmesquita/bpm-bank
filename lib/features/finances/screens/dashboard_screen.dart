@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../repositories/finances_repository.dart';
-import '../models/expense_model.dart';
 import '../widgets/month_selector.dart';
 import 'add_expense_screen.dart';
 

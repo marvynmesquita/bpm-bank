@@ -64,7 +64,7 @@ class AppTheme {
           backgroundColor: colors.accent,
           foregroundColor: Colors.white,
           elevation: 4,
-          shadowColor: colors.accent.withOpacity(0.3),
+          shadowColor: colors.accent.withValues(alpha: 0.3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),

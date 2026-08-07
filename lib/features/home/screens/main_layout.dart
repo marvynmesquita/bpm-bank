@@ -126,7 +126,7 @@ class _MainLayoutState extends State<MainLayout> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: gradient.colors.last.withOpacity(0.4),
+            color: gradient.colors.last.withValues(alpha: 0.4),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -171,7 +171,7 @@ class _MainLayoutState extends State<MainLayout> {
         boxShadow: [
           BoxShadow(
             blurRadius: 24,
-            color: Colors.black.withOpacity(isDark ? 0.4 : 0.1),
+            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.1),
             offset: const Offset(0, 8),
           ),
         ],

@@ -48,13 +48,19 @@ jobs:
         run: flutter pub get
 
       - name: Create .env (real secrets if available)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
         run: |
-          cat > .env <<EOF
-          GROQ_API_KEY=${{ secrets.GROQ_API_KEY || 'placeholder' }}
-          SUPABASE_URL=${{ secrets.SUPABASE_URL || 'placeholder' }}
-          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY || 'placeholder' }}
-          SUPABASE_PASSWORD=${{ secrets.SUPABASE_PASSWORD || 'placeholder' }}
-          EOF
+          {
+            echo "GROQ_API_KEY=${GROQ_API_KEY:-placeholder}"
+            echo "SUPABASE_URL=${SUPABASE_URL:-placeholder}"
+            echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-placeholder}"
+            echo "SUPABASE_PASSWORD=${SUPABASE_PASSWORD:-placeholder}"
+          } > .env
+          echo ".env criado"
 
       - name: Build Web (with base href "/" and --release)
         run: flutter build web --release --dart-define-from-file=.env --base-href "/"

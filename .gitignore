@@ -46,3 +46,7 @@ app.*.map.json
 
 # Environment Variables
 .env*
+
+# Temporary orphan submodule / leftover dir
+.tmp_foodordering/
+.vercel_cache/

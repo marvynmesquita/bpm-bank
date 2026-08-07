@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../finances/models/category_model.dart';
-import '../../../core/theme/app_colors.dart';
 
 class CategorySummaryCard extends StatelessWidget {
   final CategoryModel category;
@@ -41,7 +40,7 @@ class CategorySummaryCard extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               blurRadius: 16,
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
               offset: const Offset(0, 6),
             ),
           ],
@@ -51,8 +50,8 @@ class CategorySummaryCard extends StatelessWidget {
           child: InkWell(
             borderRadius: BorderRadius.circular(24),
             onTap: onTap,
-            splashColor: finalColor.withOpacity(0.1),
-            highlightColor: finalColor.withOpacity(0.05),
+            splashColor: finalColor.withValues(alpha: 0.1),
+            highlightColor: finalColor.withValues(alpha: 0.05),
             child: Padding(
               padding: const EdgeInsets.all(20.0),
               child: Column(
@@ -122,7 +121,7 @@ class _HeaderSection extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.15),
+              color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
