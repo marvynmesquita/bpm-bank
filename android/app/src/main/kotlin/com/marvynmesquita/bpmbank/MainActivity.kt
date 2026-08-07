@@ -1,4 +1,4 @@
-package com.example.bpm_bank
+package com.marvynmesquita.bpmbank
 
 import io.flutter.embedding.android.FlutterActivity
 
