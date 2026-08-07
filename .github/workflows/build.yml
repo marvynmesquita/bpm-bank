@@ -6,12 +6,19 @@ on:
       - 'v*.*.*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+  packages: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        fetch-tags: true
 
     - name: Setup Java
       uses: actions/setup-java@v4
@@ -77,14 +84,22 @@ jobs:
       run: flutter build web --release --dart-define-from-file=.env
 
     - name: Build APK
-      if: startsWith(github.ref, 'refs/tags/v')
       run: flutter build apk --release --dart-define-from-file=.env
 
     - name: Build AppBundle
-      if: startsWith(github.ref, 'refs/tags/v')
       run: flutter build appbundle --release --dart-define-from-file=.env
 
-    - name: Create Release
+    - name: Upload APK / AAB as workflow artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: bpm-bank-android-${{ github.sha }}
+        path: |
+          build/app/outputs/flutter-apk/app-release.apk
+          build/app/outputs/bundle/release/app-release.aab
+        retention-days: 30
+        if-no-files-found: error
+
+    - name: Create GitHub Release (only on push tag v*)
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
@@ -94,5 +109,6 @@ jobs:
         draft: false
         prerelease: false
         generate_release_notes: true
+        fail_on_unmatched_files: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
